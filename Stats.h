@@ -107,7 +107,7 @@ namespace RtkLoader {
         //0x19C -> IA32_THERM_STATUS -> temp (value >> 16) & 0x7F;
         //0x1A2 -> IA32_TEMPERATURE_TARGET -> TjMax 
 
-        RtkLoader::Load("C:\\Users\\link gamer\\Documents\\RTCore64.sys");
+        RtkLoader::Load("");
 
         if (!loaded) {
 
@@ -178,7 +178,7 @@ struct monitor {
     bool gpuInit = false;
 
     monitor() {
-        RtkLoader::Load(("C:\\Users\\link gamer\\Documents\\RTCore64.sys"));
+        RtkLoader::Load((""));
         if (gpuInit) return;
 
         if (PdhOpenQuery(NULL, 0, &gpuQuery) != ERROR_SUCCESS)
