@@ -75,10 +75,10 @@ namespace RtkLoader {
             return false;
         }
 
-        SC_HANDLE hService = CreateServiceA(hSCM,"RTCore64","RTCore64",SERVICE_START | DELETE | SERVICE_STOP,SERVICE_KERNEL_DRIVER,SERVICE_DEMAND_START,SERVICE_ERROR_IGNORE, path.c_str(),nullptr, nullptr, nullptr, nullptr, nullptr);
+        SC_HANDLE hService = CreateServiceA(hSCM,"","",SERVICE_START | DELETE | SERVICE_STOP,SERVICE_KERNEL_DRIVER,SERVICE_DEMAND_START,SERVICE_ERROR_IGNORE, path.c_str(),nullptr, nullptr, nullptr, nullptr, nullptr);
 
         if (!hService) {
-            hService = OpenServiceA(hSCM, "RTCore64", SERVICE_START);
+            hService = OpenServiceA(hSCM, "", SERVICE_START);
             if (!hService) {
                 std::cout << "err: RtkLoader::OpenServiceA";
                 CloseServiceHandle(hSCM);
@@ -111,7 +111,7 @@ namespace RtkLoader {
 
         if (!loaded) {
 
-            Drv = CreateFileW(L"\\\\.\\RTCore64", GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            Drv = CreateFileW(L"\\\\.\\", GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 
             if (Drv == INVALID_HANDLE_VALUE) {
                 std::cout << "CreateFileW: " << GetLastError();
@@ -144,7 +144,7 @@ namespace RtkLoader {
         SC_HANDLE hSCM = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT);
         if (!hSCM) return false;
 
-        SC_HANDLE hService = OpenServiceW(hSCM, L"RTCore64", SERVICE_STOP | DELETE);
+        SC_HANDLE hService = OpenServiceW(hSCM, L"", SERVICE_STOP | DELETE);
         if (!hService) {
             CloseServiceHandle(hSCM);
             return false;
