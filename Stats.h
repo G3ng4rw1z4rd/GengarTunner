@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <windows.h>
 #include <pdh.h>
 
@@ -28,8 +28,8 @@ struct CPU_T {
 };
 
 struct RAM_T {
-    std::pair<bool, unsigned long long> total{ true, 0 };
-    std::pair<bool, unsigned long long> usage{ true, 0 };
+    std::pair<bool, unsigned __int64 > total{ true, 0 };
+    std::pair<bool, unsigned __int64 > usage{ true, 0 };
 };
 struct GPU_T {
 
@@ -75,10 +75,10 @@ namespace RtkLoader {
             return false;
         }
 
-        SC_HANDLE hService = CreateServiceA(hSCM,"","",SERVICE_START | DELETE | SERVICE_STOP,SERVICE_KERNEL_DRIVER,SERVICE_DEMAND_START,SERVICE_ERROR_IGNORE, path.c_str(),nullptr, nullptr, nullptr, nullptr, nullptr);
+        SC_HANDLE hService = CreateServiceA(hSCM,"RTCore64","RTCore64",SERVICE_START | DELETE | SERVICE_STOP,SERVICE_KERNEL_DRIVER,SERVICE_DEMAND_START,SERVICE_ERROR_IGNORE, path.c_str(),nullptr, nullptr, nullptr, nullptr, nullptr);
 
         if (!hService) {
-            hService = OpenServiceA(hSCM, "", SERVICE_START);
+            hService = OpenServiceA(hSCM, "RTCore64", SERVICE_START);
             if (!hService) {
                 std::cout << "err: RtkLoader::OpenServiceA";
                 CloseServiceHandle(hSCM);
@@ -107,11 +107,11 @@ namespace RtkLoader {
         //0x19C -> IA32_THERM_STATUS -> temp (value >> 16) & 0x7F;
         //0x1A2 -> IA32_TEMPERATURE_TARGET -> TjMax 
 
-        RtkLoader::Load("");
+        RtkLoader::Load("C:\\Users\\link gamer\\Documents\\RTCore64.sys");
 
         if (!loaded) {
 
-            Drv = CreateFileW(L"\\\\.\\", GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            Drv = CreateFileW(L"\\\\.\\RTCore64", GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 
             if (Drv == INVALID_HANDLE_VALUE) {
                 std::cout << "CreateFileW: " << GetLastError();
@@ -144,7 +144,7 @@ namespace RtkLoader {
         SC_HANDLE hSCM = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT);
         if (!hSCM) return false;
 
-        SC_HANDLE hService = OpenServiceW(hSCM, L"", SERVICE_STOP | DELETE);
+        SC_HANDLE hService = OpenServiceW(hSCM, L"RTCore64", SERVICE_STOP | DELETE);
         if (!hService) {
             CloseServiceHandle(hSCM);
             return false;
@@ -176,9 +176,11 @@ struct monitor {
     PDH_HQUERY gpuQuery = nullptr;
     PDH_HCOUNTER gpuCounter = nullptr;
     bool gpuInit = false;
+    SharedData* shm;
+    std::vector<std::string> lines_;
 
     monitor() {
-        RtkLoader::Load((""));
+        RtkLoader::Load(("C:\\Users\\link gamer\\Documents\\RTCore64.sys"));
         if (gpuInit) return;
 
         if (PdhOpenQuery(NULL, 0, &gpuQuery) != ERROR_SUCCESS)
@@ -236,7 +238,7 @@ struct monitor {
                         line += std::format("{:.1f}GHz ", c.power.second / 1000.0);
 
                     if (c.temp.first)
-                        line += std::format("{:.1f}°C ", c.temp.second);
+                        line += std::format("{:.1f}C ", c.temp.second);
 
                     out.push_back(line);
                 }
@@ -253,6 +255,26 @@ struct monitor {
                 out.push_back(line);
 
             }
+            if (data.ram.first) {
+                auto& g = data.ram.second;
+                std::string line = "RAM: ";
+                {
+
+                    if (g.total.first) {
+                        line += std::format("{}% ", g.total.second);
+                    }
+                    if (g.usage.first) {
+                        line += std::format("{}% ", g.usage.second);
+                    }
+
+                }
+                out.push_back(line);
+
+            
+            }
+
+
+
 #pragma endregion
 
         }
@@ -402,26 +424,72 @@ struct monitor {
     }
 
     void readerCli() {
-        monitor m;
-        m.start();
+         this->start();
 
         HANDLE hMap = CreateFileMappingA(INVALID_HANDLE_VALUE,nullptr,PAGE_READWRITE,0,sizeof(SharedData),"Local\\GengarTuner");
 
-        SharedData* shm = (SharedData*)MapViewOfFile( hMap,FILE_MAP_ALL_ACCESS,0, 0,sizeof(SharedData));
+        shm = (SharedData*)MapViewOfFile( hMap,FILE_MAP_ALL_ACCESS,0, 0,sizeof(SharedData));
 
         while (true) {
-            auto lines = m.to_string();
+            lines_ = this->to_string();
 
-            if (lines.size() > 0)
-                strncpy_s(shm->line1, lines[0].c_str(), _TRUNCATE);
+            if (lines_.size() > 0)
+                strncpy_s(shm->line1, lines_[0].c_str(), _TRUNCATE);
 
-            if (lines.size() > 1)
-                strncpy_s(shm->line2, lines[1].c_str(), _TRUNCATE);
+            if (lines_.size() > 1)
+                strncpy_s(shm->line2, lines_[1].c_str(), _TRUNCATE);
 
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
-        m.stop();
+        this->stop();
     }
+    void drawTaskbar() {
+        HWND taskbar = FindWindow(L"Shell_TrayWnd", NULL);
+        if (!taskbar) return;
 
+        std::string cpul;
+        std::string gpul;
+        std::string raml;
+
+        while (true) {
+            HDC hdc = GetWindowDC(taskbar);
+
+            if (hdc) {
+                RECT rect;
+                GetClientRect(taskbar, &rect);
+
+                int width = rect.right;
+                int height = rect.bottom;
+
+                RECT r = { width / 2 - 120, 0, width / 2 + 210, height };
+                RECT r1 = { width / 2 - 130, 0, width / 2 + 220, height };
+                RECT r2 = { width / 2 - 160, 0, width / 2 + 250, height };
+
+                if (!cpul.empty()) {
+                    SetBkMode(hdc, OPAQUE);
+                    SetBkColor(hdc, GetSysColor(COLOR_3DFACE));
+
+                    std::string clear(std::string(lines_[0] + "|" + lines_[1] + "|RAM:" + std::to_string(this->data.ram.second.usage.second) + "KB/" + std::to_string(this->data.ram.second.total.second) + "KB").size()+100, ' ');
+                    DrawTextA(hdc, clear.c_str(), -1, &r,DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+                }
+
+                if (!lines_.empty()) {
+                    SetTextColor(hdc, RGB(255, 140, 0));
+                    SetBkMode(hdc, TRANSPARENT);
+                     DrawTextA(hdc, std::string(lines_[0] + "|" + lines_[1] + "|RAM:" + std::to_string(this->data.ram.second.usage.second / (1024 * 1024 * 1024) ) + "GB/" + std::to_string(this->data.ram.second.total.second / (1024 * 1024 * 1024)) + "GB").c_str(), -1, &r, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+
+                    cpul = lines_[0];
+                }
+
+ 
+
+
+
+                ReleaseDC(taskbar, hdc);
+            }
+
+            Sleep(200);
+        }
+    }
 };
